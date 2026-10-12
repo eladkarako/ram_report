@@ -1,4 +1,11 @@
-#[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))]
+#[cfg(all(
+    target_os = "linux",
+    any(
+        target_arch = "x86_64",
+        target_arch = "x86",
+        target_arch = "aarch64"
+    )
+))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
@@ -9,13 +16,13 @@ use crossterm::{
     event::{Event, EventStream, KeyCode},
     execute,
     terminal::{
-        disable_raw_mode, enable_raw_mode, Clear, ClearType,
-        EnterAlternateScreen, LeaveAlternateScreen,
+        disable_raw_mode, enable_raw_mode, Clear,
+        ClearType, EnterAlternateScreen, LeaveAlternateScreen,
     },
 };
 use futures::StreamExt;
 use indicatif::ProgressBar;
-use std::{{io},sync::Arc,time::Duration};
+use std::{io, sync::Arc, time::Duration};
 use sysinfo::System;
 use tokio::{
     sync::{broadcast, Mutex},
@@ -34,15 +41,13 @@ use winapi::{
         processthreadsapi::OpenProcess,
         psapi::EmptyWorkingSet,
         tlhelp32::{
-            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW,
-            PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+            CreateToolhelp32Snapshot, Process32FirstW,
+            Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
         },
         wincon::{SetConsoleCP, SetConsoleOutputCP},
         winnt::{PROCESS_QUERY_INFORMATION, PROCESS_SET_QUOTA},
     },
 };
-
-
 
 const HISTOGRAM_WIDTH: usize = 22;
 
@@ -56,7 +61,7 @@ struct AppState {
     trim_status: Vec<(u32, String, bool)>,
 
     #[allow(dead_code)]
-    progress_bar:Option<ProgressBar>,
+    progress_bar: Option<ProgressBar>,
 }
 
 fn format_bytes(b: u64) -> String {
@@ -147,7 +152,7 @@ async fn main() -> Result<()> {
         total_ram: 0,
         is_trimming: false,
         trim_status: Vec::new(),
-        progress_bar:None,
+        progress_bar: None,
     }));
 
     let (tx, rx) = broadcast::channel(1);
@@ -199,7 +204,9 @@ fn spawn_input_handler(
         while let Some(Ok(evt)) = reader.next().await {
             match evt {
                 Event::Key(k) => match k.code {
-                    KeyCode::Char('q') | KeyCode::Char('x') | KeyCode::Esc => {
+                    KeyCode::Char('q')
+                    | KeyCode::Char('x')
+                    | KeyCode::Esc => {
                         let _ = tx.send(());
                         return; // Exit the task immediately
                     }
@@ -216,7 +223,7 @@ fn spawn_input_handler(
                             tokio::spawn(async move {
                                 trim_all(state_trim).await;
                             });
-                            let _ = render_tx.send(());  // Just send directly. this wil not be used in linux, so in linux render_tx is unused. I don't want to underscore it, instead I'll allow unused variable for this function.
+                            let _ = render_tx.send(()); // Just send directly. this wil not be used in linux, so in linux render_tx is unused. I don't want to underscore it, instead I'll allow unused variable for this function.
                         }
                     }
                     _ => {}
@@ -323,29 +330,39 @@ async fn trim_all(state: Arc<Mutex<AppState>>) {
     let _ = execute!(stdout, EnterAlternateScreen, Hide);
 }
 
-#[cfg(target_os="windows")]
-async fn initialize_trim_status(state:Arc<Mutex<AppState>>,procs:&[ProcInfo],){
+#[cfg(target_os = "windows")]
+async fn initialize_trim_status(
+    state: Arc<Mutex<AppState>>,
+    procs: &[ProcInfo],
+) {
     let pb = ProgressBar::new(procs.len() as u64);
-    pb.set_style(indicatif::ProgressStyle::default_bar()
-        .template("[{bar:40.cyan/blue}] {pos}/{len} trimmed")
-        .unwrap());
+    pb.set_style(
+        indicatif::ProgressStyle::default_bar()
+            .template("[{bar:40.cyan/blue}] {pos}/{len} trimmed")
+            .unwrap(),
+    );
 
-    let mut s=state.lock().await;
-    s.trim_status=procs.iter().map(|p|(p.pid,p.path.clone(),false)).collect();
-    s.progress_bar=Some(pb);
+    let mut s = state.lock().await;
+    s.trim_status = procs
+        .iter()
+        .map(|p| (p.pid, p.path.clone(), false))
+        .collect();
+    s.progress_bar = Some(pb);
 }
 
-
-#[cfg(target_os="windows")]
-async fn spawn_trim_tasks(state:Arc<Mutex<AppState>>,procs:Vec<ProcInfo>){
-    let sem=Arc::new(tokio::sync::Semaphore::new(4));
+#[cfg(target_os = "windows")]
+async fn spawn_trim_tasks(
+    state: Arc<Mutex<AppState>>,
+    procs: Vec<ProcInfo>,
+) {
+    let sem = Arc::new(tokio::sync::Semaphore::new(4));
     let mut handles = Vec::new();
-    for proc in procs{
-        let sem_c=Arc::clone(&sem);
-        let state_c=Arc::clone(&state);
-        let handle = tokio::spawn(async move{
-            let _permit=sem_c.acquire().await;
-            execute_trim_task(proc.pid,state_c).await;
+    for proc in procs {
+        let sem_c = Arc::clone(&sem);
+        let state_c = Arc::clone(&state);
+        let handle = tokio::spawn(async move {
+            let _permit = sem_c.acquire().await;
+            execute_trim_task(proc.pid, state_c).await;
             sleep(Duration::from_millis(10)).await;
         });
         handles.push(handle);
@@ -355,8 +372,6 @@ async fn spawn_trim_tasks(state:Arc<Mutex<AppState>>,procs:Vec<ProcInfo>){
         let _ = handle.await;
     }
 }
-
-
 
 #[cfg(target_os = "windows")]
 async fn execute_trim_task(
@@ -372,24 +387,30 @@ async fn execute_trim_task(
     update_trim_status(state, pid, ok).await;
 }
 
-#[cfg(target_os="windows")]
-async fn update_trim_status(state:Arc<Mutex<AppState>>,pid:u32,success:bool,){
-    let mut s=state.lock().await;
-    if let Some(entry)=s.trim_status.iter_mut().find(|(p,_,_)|*p==pid){
-        entry.2=success;
+#[cfg(target_os = "windows")]
+async fn update_trim_status(
+    state: Arc<Mutex<AppState>>,
+    pid: u32,
+    success: bool,
+) {
+    let mut s = state.lock().await;
+    if let Some(entry) =
+        s.trim_status.iter_mut().find(|(p, _, _)| *p == pid)
+    {
+        entry.2 = success;
     }
     if let Some(pb) = &s.progress_bar {
         pb.inc(1);
     }
 }
 
-#[cfg(target_os="windows")]
-async fn finalize_trim(state:Arc<Mutex<AppState>>){
-    let mut s=state.lock().await;
+#[cfg(target_os = "windows")]
+async fn finalize_trim(state: Arc<Mutex<AppState>>) {
+    let mut s = state.lock().await;
     if let Some(pb) = s.progress_bar.take() {
         pb.finish_with_message("✓ Memory trim complete");
     }
-    s.is_trimming=false;
+    s.is_trimming = false;
 }
 
 #[cfg(target_os = "windows")]
