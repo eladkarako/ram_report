@@ -8,4 +8,9 @@
 
 /target/
 
-*_minified_*
+*_minified*
+
+/resources/**/*.rs
+
+main - Copy.rs
+main-*.rs
