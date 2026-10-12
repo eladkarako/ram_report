@@ -79,6 +79,19 @@ binaries available to download for multiple OS and CPU architectures.
 
 <hr/>
 
+### infographics
+
+![](resources/logos/infographics_functionality.png)
+
+<hr/>
+
+![](resources/logos/infographics_baseline.png)
+
+<hr/>
+
+![](resources/logos/infographics_windows_trim.png)
+
+<hr/>
 
 ### build
 
