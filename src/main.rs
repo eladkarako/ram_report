@@ -21,7 +21,7 @@ use crossterm::{
     },
 };
 use futures::StreamExt;
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::{io, sync::Arc, time::Duration};
 use sysinfo::System;
 use tokio::{
@@ -59,8 +59,7 @@ struct AppState {
     total_ram: u64,
     is_trimming: bool,
     trim_status: Vec<(u32, String, bool)>,
-
-    #[allow(dead_code)]
+    ram_bar: Option<ProgressBar>,
     progress_bar: Option<ProgressBar>,
 }
 
@@ -88,41 +87,41 @@ fn get_ram_usage() -> (u64, u64) {
     (used, total)
 }
 
-fn format_history_block(
-    used: u64,
-    total: u64,
-) -> char {
-    if total == 0 {
-        return '░';
-    }
-    let pct = (used * 100) / total;
-    match pct {
-        90..=100 => '█',
-        80..=89 => '▇',
-        70..=79 => '▆',
-        60..=69 => '▅',
-        50..=59 => '▄',
-        40..=49 => '▃',
-        30..=39 => '▂',
-        _ => '░',
-    }
+fn create_ram_bar_style() -> ProgressStyle {
+    ProgressStyle::default_bar()
+        .template("[{bar:20.cyan/blue}] {percent:>3}%")
+        .unwrap()
+        .progress_chars("█░")
 }
 
-fn spinner_char(step: usize) -> char {
-    ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'][step % 10]
+fn create_history_bar_style() -> ProgressStyle {
+    ProgressStyle::default_bar().template("{msg}").unwrap()
 }
 
-fn build_vertical_bar(
-    used: u64,
+fn build_history_indicator(
+    history: &[u64],
     total: u64,
 ) -> String {
     if total == 0 {
-        return String::new();
+        return "Hist: [░░░░░░░░░░░░░░░░░░░░]".to_string();
     }
-    let pct = (used * 100) / total;
-    let filled = (pct / 10) as usize;
-    let empty = 10 - filled;
-    format!("[{}{}] {}%", "█".repeat(filled), "░".repeat(empty), pct)
+    let indicators: String = history
+        .iter()
+        .map(|&u| {
+            let pct = (u * 100) / total;
+            match pct {
+                90..=100 => '█',
+                80..=89 => '▇',
+                70..=79 => '▆',
+                60..=69 => '▅',
+                50..=59 => '▄',
+                40..=49 => '▃',
+                30..=39 => '▂',
+                _ => '░',
+            }
+        })
+        .collect();
+    format!("Hist: [{}]", indicators)
 }
 
 #[cfg(target_os = "windows")]
@@ -152,11 +151,12 @@ async fn main() -> Result<()> {
         total_ram: 0,
         is_trimming: false,
         trim_status: Vec::new(),
+        ram_bar: None,
         progress_bar: None,
     }));
 
     let (tx, rx) = broadcast::channel(1);
-    let (render_tx, render_rx) = tokio::sync::mpsc::channel(1); // Add this
+    let (render_tx, render_rx) = tokio::sync::mpsc::channel(1);
 
     {
         let (used, total) = get_ram_usage();
@@ -166,11 +166,12 @@ async fn main() -> Result<()> {
         s.start_ram = used;
         s.baseline = used;
         s.history[0] = used;
+        s.ram_bar = Some(ProgressBar::new(100));
     }
 
     spawn_ram_monitor(Arc::clone(&state));
-    spawn_input_handler(Arc::clone(&state), tx, render_tx); // Add render_tx
-    run_main_loop(Arc::clone(&state), rx, render_rx).await?; // Add render_rx
+    spawn_input_handler(Arc::clone(&state), tx, render_tx);
+    run_main_loop(Arc::clone(&state), rx, render_rx).await?;
 
     disable_raw_mode()?;
     execute!(stdout, LeaveAlternateScreen, Show)?;
@@ -208,7 +209,7 @@ fn spawn_input_handler(
                     | KeyCode::Char('x')
                     | KeyCode::Esc => {
                         let _ = tx.send(());
-                        return; // Exit the task immediately
+                        return;
                     }
                     KeyCode::Char('r') => {
                         let mut s = state.lock().await;
@@ -223,7 +224,7 @@ fn spawn_input_handler(
                             tokio::spawn(async move {
                                 trim_all(state_trim).await;
                             });
-                            let _ = render_tx.send(()); // Just send directly. this wil not be used in linux, so in linux render_tx is unused. I don't want to underscore it, instead I'll allow unused variable for this function.
+                            let _ = render_tx.send(());
                         }
                     }
                     _ => {}
@@ -270,19 +271,11 @@ fn render_trim_status(s: &AppState) {
     let _ = execute!(stdout, MoveTo(0, 0), Clear(ClearType::All));
     println!("\n=== Memory Trim ===");
     for (pid, path, done) in &s.trim_status {
-        let sym = if *done {
-            "✓".to_string()
-        } else {
-            let step = (std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as usize)
-                / 100;
-            format!("{}", spinner_char(step))
-        };
+        let sym = if *done { "✓" } else { "◆" };
         println!("[{}] PID {} - {}", sym, pid, path);
     }
 }
+
 fn render_ram_stats(s: &AppState) {
     let (used, total) = get_ram_usage();
     let delta = if s.baseline > used {
@@ -291,12 +284,8 @@ fn render_ram_stats(s: &AppState) {
         (used - s.baseline, "+")
     };
 
-    let hist = s
-        .history
-        .iter()
-        .map(|&u| format_history_block(u, s.total_ram))
-        .collect::<String>();
-    let vertical_bar = build_vertical_bar(used, total);
+    let pct =
+        if total > 0 { ((used * 100) / total) as u64 } else { 0 };
 
     let mut stdout = io::stdout();
     let _ = execute!(stdout, MoveTo(0, 0), Clear(ClearType::All));
@@ -307,14 +296,20 @@ fn render_ram_stats(s: &AppState) {
         format_bytes(total),
         delta.1,
         format_delta(delta.0)
-    ); // Changed this line
-    println!("{}", vertical_bar);
-    println!("Hist: [{}]", hist);
+    );
+
+    if let Some(ref bar) = s.ram_bar {
+        bar.set_position(pct);
+        bar.set_style(create_ram_bar_style());
+    }
+
+    let history_str =
+        build_history_indicator(&s.history, s.total_ram);
+    println!("{}", history_str);
 }
 
 #[cfg(target_os = "windows")]
 async fn trim_all(state: Arc<Mutex<AppState>>) {
-    // Exit raw mode and alternate screen for indicatif
     let _ = disable_raw_mode();
     let mut stdout = io::stdout();
     let _ = execute!(stdout, LeaveAlternateScreen, Show);
@@ -325,7 +320,6 @@ async fn trim_all(state: Arc<Mutex<AppState>>) {
     finalize_trim(Arc::clone(&state)).await;
     sleep(Duration::from_secs(3)).await;
 
-    // Re-enter raw mode and alternate screen
     let _ = enable_raw_mode();
     let _ = execute!(stdout, EnterAlternateScreen, Hide);
 }
@@ -337,7 +331,7 @@ async fn initialize_trim_status(
 ) {
     let pb = ProgressBar::new(procs.len() as u64);
     pb.set_style(
-        indicatif::ProgressStyle::default_bar()
+        ProgressStyle::default_bar()
             .template("[{bar:40.cyan/blue}] {pos}/{len} trimmed")
             .unwrap(),
     );
@@ -367,7 +361,6 @@ async fn spawn_trim_tasks(
         });
         handles.push(handle);
     }
-    // Wait for all tasks to complete
     for handle in handles {
         let _ = handle.await;
     }
