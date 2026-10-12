@@ -1,30 +1,30 @@
 [package]
-name = "ram_report"
-version = "26.11.12"
-edition = "2024"
 authors = ["Elad Karako <eladkarako@gmail.com>"]
+categories = ["command-line-utilities", "memory"]
 description = "physical memory report for all platforms. Windows users can press W to free some RAM from other programs (FreeRam-XP-Pro style)."
 documentation = "https://github.com/eladkarako/ram_report#readme"
+edition = "2024"
 homepage = "https://github.com/eladkarako/ram_report"
 keywords = ["ram", "report", "memory", "windows", "cli"]
-categories = ["command-line-utilities", "memory"]
 license = "MIT"
+name = "ram_report"
 readme = "README.md"
 repository = "https://github.com/eladkarako/ram_report"
 rust-version = "1.93.0"
-
+version = "26.11.13"
 
 [dependencies]
-tokio = { version = "1.53.2", features = ["full"] }
-crossterm = { version = "0.29.0", features = ["event-stream"] }
-sysinfo = { version = "0.39.6", features = ["multithread"] }
-indicatif = { version = "0.18.6", features = ["tokio"] }
 anyhow = "1.0.104"
-thiserror = "2.0.21"
-env_logger = "0.11.11"
-log = "0.4.34"
 bytesize = { version = "2.7.0" }
+crossterm = { version = "0.29.0", features = ["event-stream"] }
+env_logger = "0.11.11"
 futures = "0.3.34"
+indicatif = { version = "0.18.6", features = ["tokio"] }
+log = "0.4.34"
+sysinfo = { version = "0.39.6", features = ["multithread"] }
+thiserror = "2.0.21"
+tokio = { version = "1.53.2", features = ["full"] }
+mimalloc = "0.1.52"
 
 # Optional: Memory allocation improvements
 [target.'cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))'.dependencies]
