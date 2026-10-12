@@ -15,12 +15,17 @@ use crossterm::{
 };
 use futures::StreamExt;
 use indicatif::ProgressBar;
-use std::{{io, mem},sync::Arc,time::Duration};
+use std::{{io},sync::Arc,time::Duration};
 use sysinfo::System;
 use tokio::{
     sync::{broadcast, Mutex},
     time::sleep,
 };
+
+#[cfg(target_os = "windows")]
+use std::mem;
+
+#[cfg(target_os = "windows")]
 use winapi::{
     ctypes::c_void,
     shared::minwindef::FALSE,
@@ -49,6 +54,8 @@ struct AppState {
     total_ram: u64,
     is_trimming: bool,
     trim_status: Vec<(u32, String, bool)>,
+
+    #[allow(dead_code)]
     progress_bar:Option<ProgressBar>,
 }
 
@@ -181,6 +188,7 @@ fn spawn_ram_monitor(state: Arc<Mutex<AppState>>) {
     });
 }
 
+#[allow(unused_variables)]
 fn spawn_input_handler(
     state: Arc<Mutex<AppState>>,
     tx: broadcast::Sender<()>,
@@ -199,6 +207,7 @@ fn spawn_input_handler(
                         let mut s = state.lock().await;
                         s.baseline = s.current_ram;
                     }
+                    #[cfg(target_os = "windows")]
                     KeyCode::Char('w') => {
                         let mut s = state.lock().await;
                         if !s.is_trimming {
@@ -207,7 +216,7 @@ fn spawn_input_handler(
                             tokio::spawn(async move {
                                 trim_all(state_trim).await;
                             });
-                            let _ = render_tx.send(());  // Just send directly
+                            let _ = render_tx.send(());  // Just send directly. this wil not be used in linux, so in linux render_tx is unused. I don't want to underscore it, instead I'll allow unused variable for this function.
                         }
                     }
                     _ => {}
