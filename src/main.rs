@@ -12,17 +12,19 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use anyhow::Result;
 use bytesize::ByteSize;
 use crossterm::{
-    cursor::{Hide, MoveTo, Show},
     event::{Event, EventStream, KeyCode},
     execute,
     terminal::{
-        disable_raw_mode, enable_raw_mode, Clear,
-        ClearType, EnterAlternateScreen, LeaveAlternateScreen,
+        disable_raw_mode, enable_raw_mode,
+        EnterAlternateScreen, LeaveAlternateScreen,
     },
 };
 use futures::StreamExt;
-use indicatif::{ProgressBar, ProgressStyle};
-use std::{io, sync::Arc, time::Duration};
+use ratatui::{
+    backend::CrosstermBackend, widgets::Paragraph, Terminal,
+};
+use std::time::Duration;
+use std::{io, sync::Arc};
 use sysinfo::System;
 use tokio::{
     sync::{broadcast, Mutex},
@@ -59,8 +61,8 @@ struct AppState {
     total_ram: u64,
     is_trimming: bool,
     trim_status: Vec<(u32, String, bool)>,
-    ram_bar: Option<ProgressBar>,
-    progress_bar: Option<ProgressBar>,
+    progress_count: u64,
+    progress_total: u64,
 }
 
 fn format_bytes(b: u64) -> String {
@@ -82,20 +84,7 @@ fn get_ram_usage() -> (u64, u64) {
     sys.refresh_all();
     let total = sys.total_memory();
     let used = sys.used_memory();
-
-    // sysinfo returns in KB, convert to bytes
     (used, total)
-}
-
-fn create_ram_bar_style() -> ProgressStyle {
-    ProgressStyle::default_bar()
-        .template("[{bar:20.cyan/blue}] {percent:>3}%")
-        .unwrap()
-        .progress_chars("█░")
-}
-
-fn create_history_bar_style() -> ProgressStyle {
-    ProgressStyle::default_bar().template("{msg}").unwrap()
 }
 
 fn build_history_indicator(
@@ -139,9 +128,13 @@ fn set_console_utf8() {}
 async fn main() -> Result<()> {
     env_logger::init();
     set_console_utf8();
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, Hide)?;
+    execute!(stdout, EnterAlternateScreen)?;
+
+    let backend = CrosstermBackend::new(stdout);
+    let terminal = Terminal::new(backend)?;
 
     let state = Arc::new(Mutex::new(AppState {
         history: vec![0; HISTOGRAM_WIDTH],
@@ -151,8 +144,8 @@ async fn main() -> Result<()> {
         total_ram: 0,
         is_trimming: false,
         trim_status: Vec::new(),
-        ram_bar: None,
-        progress_bar: None,
+        progress_count: 0,
+        progress_total: 0,
     }));
 
     let (tx, rx) = broadcast::channel(1);
@@ -166,15 +159,16 @@ async fn main() -> Result<()> {
         s.start_ram = used;
         s.baseline = used;
         s.history[0] = used;
-        s.ram_bar = Some(ProgressBar::new(100));
     }
 
     spawn_ram_monitor(Arc::clone(&state));
     spawn_input_handler(Arc::clone(&state), tx, render_tx);
-    run_main_loop(Arc::clone(&state), rx, render_rx).await?;
+    run_main_loop(Arc::clone(&state), rx, render_rx, terminal)
+        .await?;
 
     disable_raw_mode()?;
-    execute!(stdout, LeaveAlternateScreen, Show)?;
+    let mut stdout = io::stdout();
+    execute!(stdout, LeaveAlternateScreen)?;
     Ok(())
 }
 
@@ -186,8 +180,6 @@ fn spawn_ram_monitor(state: Arc<Mutex<AppState>>) {
             let mut s = state.lock().await;
             s.current_ram = used;
             s.total_ram = total;
-
-            // Shift history left and add new value at end
             s.history.remove(0);
             s.history.push(used);
         }
@@ -239,6 +231,7 @@ async fn run_main_loop(
     state: Arc<Mutex<AppState>>,
     mut rx: broadcast::Receiver<()>,
     mut render_rx: tokio::sync::mpsc::Receiver<()>,
+    mut terminal: Terminal<CrosstermBackend<io::Stdout>>,
 ) -> Result<()> {
     loop {
         tokio::select! {
@@ -246,51 +239,47 @@ async fn run_main_loop(
                 break;
             }
             _=render_rx.recv()=>{
-                render_frame(Arc::clone(&state)).await;
+                render_frame(&mut terminal, Arc::clone(&state)).await?;
             }
             _=sleep(Duration::from_secs(2))=>{
-                render_frame(Arc::clone(&state)).await;
+                render_frame(&mut terminal, Arc::clone(&state)).await?;
             }
         }
     }
     Ok(())
 }
 
-async fn render_frame(state: Arc<Mutex<AppState>>) {
+async fn render_frame(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    state: Arc<Mutex<AppState>>,
+) -> Result<()> {
     let s = state.lock().await;
+
     if s.is_trimming {
-        render_trim_status(&s);
+        render_trim_status(terminal, &s)?;
     } else {
-        render_ram_stats(&s);
+        render_ram_stats(terminal, &s)?;
     }
     drop(s);
+
+    Ok(())
 }
 
-fn render_trim_status(s: &AppState) {
-    let mut stdout = io::stdout();
-    let _ = execute!(stdout, MoveTo(0, 0), Clear(ClearType::All));
-    println!("\n=== Memory Trim ===");
-    for (pid, path, done) in &s.trim_status {
-        let sym = if *done { "✓" } else { "◆" };
-        println!("[{}] PID {} - {}", sym, pid, path);
-    }
-}
-
-fn render_ram_stats(s: &AppState) {
+fn render_ram_stats(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    state: &AppState,
+) -> Result<()> {
     let (used, total) = get_ram_usage();
-    let delta = if s.baseline > used {
-        (s.baseline - used, "-")
+    let delta = if state.baseline > used {
+        (state.baseline - used, "-")
     } else {
-        (used - s.baseline, "+")
+        (used - state.baseline, "+")
     };
 
     let pct =
         if total > 0 { ((used * 100) / total) as u64 } else { 0 };
 
-    let mut stdout = io::stdout();
-    let _ = execute!(stdout, MoveTo(0, 0), Clear(ClearType::All));
-
-    println!(
+    let ram_line = format!(
         "RAM: {} / {} | Δ: {}{}",
         format_bytes(used),
         format_bytes(total),
@@ -298,30 +287,88 @@ fn render_ram_stats(s: &AppState) {
         format_delta(delta.0)
     );
 
-    if let Some(ref bar) = s.ram_bar {
-        bar.set_position(pct);
-        bar.set_style(create_ram_bar_style());
+    let bar_line = create_ram_bar_display(pct);
+    let history_line =
+        build_history_indicator(&state.history, state.total_ram);
+
+    let output =
+        format!("{}\n{}\n{}", ram_line, bar_line, history_line);
+
+    terminal.draw(|f| {
+        let paragraph = Paragraph::new(output);
+        f.render_widget(paragraph, f.area());
+    })?;
+
+    Ok(())
+}
+
+fn create_ram_bar_display(pct: u64) -> String {
+    let filled = (pct / 5) as usize;
+    let empty = 20 - filled;
+    let bar = format!(
+        "[{}{}] {}%",
+        "█".repeat(filled),
+        "░".repeat(empty),
+        pct
+    );
+    bar
+}
+
+fn render_trim_status(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    state: &AppState,
+) -> Result<()> {
+    let mut output = String::from("=== Memory Trim ===\n");
+
+    for (pid, path, done) in &state.trim_status {
+        let sym = if *done { "✓" } else { "◆" };
+        output.push_str(&format!(
+            "[{}] PID {} - {}\n",
+            sym, pid, path
+        ));
     }
 
-    let history_str =
-        build_history_indicator(&s.history, s.total_ram);
-    println!("{}", history_str);
+    let progress_line = format!(
+        "\n[{}] {}/{} processes trimmed",
+        create_progress_bar(
+            state.progress_count,
+            state.progress_total
+        ),
+        state.progress_count,
+        state.progress_total
+    );
+    output.push_str(&progress_line);
+
+    terminal.draw(|f| {
+        let paragraph = Paragraph::new(output);
+        f.render_widget(paragraph, f.area());
+    })?;
+
+    Ok(())
+}
+
+fn create_progress_bar(
+    current: u64,
+    total: u64,
+) -> String {
+    if total == 0 {
+        return "░░░░░░░░░░░░░░░░░░░░".to_string();
+    }
+    let filled = ((current * 40) / total) as usize;
+    let empty = 40 - filled;
+    format!("{}{}", "█".repeat(filled), "░".repeat(empty))
 }
 
 #[cfg(target_os = "windows")]
 async fn trim_all(state: Arc<Mutex<AppState>>) {
-    let _ = disable_raw_mode();
-    let mut stdout = io::stdout();
-    let _ = execute!(stdout, LeaveAlternateScreen, Show);
-
     let procs = enumerate_processes();
     initialize_trim_status(Arc::clone(&state), &procs).await;
     spawn_trim_tasks(Arc::clone(&state), procs).await;
     finalize_trim(Arc::clone(&state)).await;
     sleep(Duration::from_secs(3)).await;
 
-    let _ = enable_raw_mode();
-    let _ = execute!(stdout, EnterAlternateScreen, Hide);
+    let mut s = state.lock().await;
+    s.is_trimming = false;
 }
 
 #[cfg(target_os = "windows")]
@@ -329,19 +376,13 @@ async fn initialize_trim_status(
     state: Arc<Mutex<AppState>>,
     procs: &[ProcInfo],
 ) {
-    let pb = ProgressBar::new(procs.len() as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("[{bar:40.cyan/blue}] {pos}/{len} trimmed")
-            .unwrap(),
-    );
-
     let mut s = state.lock().await;
     s.trim_status = procs
         .iter()
         .map(|p| (p.pid, p.path.clone(), false))
         .collect();
-    s.progress_bar = Some(pb);
+    s.progress_total = procs.len() as u64;
+    s.progress_count = 0;
 }
 
 #[cfg(target_os = "windows")]
@@ -351,6 +392,7 @@ async fn spawn_trim_tasks(
 ) {
     let sem = Arc::new(tokio::sync::Semaphore::new(4));
     let mut handles = Vec::new();
+
     for proc in procs {
         let sem_c = Arc::clone(&sem);
         let state_c = Arc::clone(&state);
@@ -361,6 +403,7 @@ async fn spawn_trim_tasks(
         });
         handles.push(handle);
     }
+
     for handle in handles {
         let _ = handle.await;
     }
@@ -392,18 +435,13 @@ async fn update_trim_status(
     {
         entry.2 = success;
     }
-    if let Some(pb) = &s.progress_bar {
-        pb.inc(1);
-    }
+    s.progress_count += 1;
 }
 
 #[cfg(target_os = "windows")]
 async fn finalize_trim(state: Arc<Mutex<AppState>>) {
     let mut s = state.lock().await;
-    if let Some(pb) = s.progress_bar.take() {
-        pb.finish_with_message("✓ Memory trim complete");
-    }
-    s.is_trimming = false;
+    s.progress_count = s.progress_total;
 }
 
 #[cfg(target_os = "windows")]
@@ -425,9 +463,7 @@ fn trim_proc(pid: u32) -> bool {
 
 #[cfg(target_os = "windows")]
 unsafe fn execute_trim_syscalls(handle: *mut c_void) {
-    unsafe {
-        let _ = EmptyWorkingSet(handle);
-    }
+    let _ = unsafe { EmptyWorkingSet(handle) };
 }
 
 #[cfg(target_os = "windows")]
@@ -486,4 +522,11 @@ unsafe fn extract_process_name(entry: &PROCESSENTRY32W) -> String {
             .unwrap_or(wide_slice),
     )
         .to_string()
+}
+
+#[cfg(not(target_os = "windows"))]
+async fn trim_all(state: Arc<Mutex<AppState>>) {
+    // No-op on non-Windows platforms
+    let mut s = state.lock().await;
+    s.is_trimming = false;
 }

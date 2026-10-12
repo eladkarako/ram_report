@@ -25,6 +25,7 @@ sysinfo = { version = "0.39.6", features = ["multithread"] }
 thiserror = "2.0.21"
 tokio = { version = "1.53.2", features = ["full"] }
 mimalloc = "0.1.52"
+ratatui = { version = "0.30.2", features = ["crossterm", "layout-cache"] }
 
 # Optional: Memory allocation improvements
 [target.'cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))'.dependencies]
