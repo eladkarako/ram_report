@@ -4,9 +4,9 @@
 
 physical memory. 
 
-- text. used/free/total + delta of used memory. in human-readable sizes.
+- text. used/free/total + delta of used memory. human-readable sizes.
 - charts. used/free/total percentage + histogram that shows changes in few last minutes.
-- Windows users have addition free RAM functionality that really works!
+- Windows users have an additional 'free RAM' functionality that really works!
 
 click: 
 - <kbd>r</kbd> to reset the delta reference to "right now".
