@@ -5,12 +5,12 @@
 
 [build]
 incremental = false
-jobs        = 5
+jobs        = 2
 
 #---------------------------------- Windows MSVC x86 (enable large address space, remove unreferenced code/data, identical code folding (merge duplicate code))
 [target.i686-pc-windows-msvc]
-linker    = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x86\link.exe'
-ar        = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x86\lib.exe'
+#linker    = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x86\link.exe'
+#ar        = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x86\lib.exe'
 rustflags = ['-C', 'link-arg=/LARGEADDRESSAWARE',
              '-C', 'link-arg=/OPT:REF',
              '-C', 'link-arg=/OPT:ICF',
@@ -18,16 +18,16 @@ rustflags = ['-C', 'link-arg=/LARGEADDRESSAWARE',
             ]
 
 [target.x86_64-pc-windows-msvc]
-linker    = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\link.exe'
-ar        = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\lib.exe'
+#linker    = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\link.exe'
+#ar        = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\lib.exe'
 rustflags = ['-C', 'link-arg=/OPT:REF',
              '-C', 'link-arg=/OPT:ICF',
              '-C', 'link-arg=/DEBUG:NONE',
             ]
 
 [target.aarch64-pc-windows-msvc]
-linker    = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\arm64\link.exe'
-ar        = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\arm64\lib.exe'
+#linker    = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\arm64\link.exe'
+#ar        = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\arm64\lib.exe'
 rustflags = ['-C', 'link-arg=/OPT:REF',
              '-C', 'link-arg=/OPT:ICF',
              '-C', 'link-arg=/DEBUG:NONE',
