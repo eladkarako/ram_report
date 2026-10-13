@@ -1,2 +1,8 @@
+26.10.13
+* removing key-event system, increasing refresh rate, fixing write position.
+* using `ratatui` widget like system for most of the UI drawing.
+- removing Windows functionality - it will get its own program.
+* fixing hang time on start and improving memory query.
+
 26.10.12
 + initial
