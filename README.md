@@ -2,6 +2,8 @@
 
 RAM info in terminal (press: `q` to quit, `r` to reset a reference point in-time used RAM difference).
 
+![](screenshot_program.png)
+
 <hr/>
 
 <details><summary><h3>👇  download</h3></summary>
