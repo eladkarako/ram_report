@@ -1,3 +1,10 @@
+26.10.14
+* improved readibility. now all in 3 `ratatui`-"widgets" (two charts and one which is is a paragraph-widget).
+* adding right/left 1-"space" padding to avoid cropping.
+* consuming ctrl+c as well as q (quit), and r (refresh), and on windows alt+f4. working in raw terminal mode for reactivity kind of makes it mandatory.
+* making border and descriptions to include better formatted sizes.
+* delta (diff) widget (paragraph) has the referenced used RAM size in the border-title (as well as instruction to press R to reset).
+
 26.10.13
 * removing key-event system, increasing refresh rate, fixing write position.
 * using `ratatui` widget like system for most of the UI drawing.

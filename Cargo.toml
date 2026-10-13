@@ -11,7 +11,7 @@ name = "ram_report"
 readme = "README.md"
 repository = "https://github.com/eladkarako/ram_report"
 rust-version = "1.93.0"
-version = "26.11.13"
+version = "26.11.14"
 
 [dependencies]
 anyhow = { version = "1.0.104" }
