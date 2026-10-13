@@ -15,8 +15,8 @@ version = "26.11.13"
 
 [dependencies]
 anyhow = { version = "1.0.104" }
-bytesize = { version = "2.7.0" }
 crossterm = { version = "0.29.0", features = ["events", "libc", "windows"] }
+humansize = { version = "2.1.3" }
 parking_lot = { version = "0.12.5" }
 ratatui = { version = "0.30.2", features = ["crossterm", "layout-cache"] }
 sys-info = { version = "0.9.1" }

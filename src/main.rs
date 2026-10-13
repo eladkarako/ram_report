@@ -18,6 +18,7 @@ use crossterm::{
         EnterAlternateScreen, LeaveAlternateScreen,
     },
 };
+use humansize::{format_size, BINARY};
 use parking_lot::RwLock;
 use ratatui::{
     backend::CrosstermBackend,
@@ -29,8 +30,7 @@ use std::{
     collections::VecDeque,
     io::Stdout,
     sync::atomic::{AtomicBool, Ordering},
-    sync::Arc
-    ,
+    sync::Arc,
     time::Duration,
 };
 
@@ -211,22 +211,35 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                     // Calculate delta from reference
                     let delta = state.current.used as i64
                         - state.reference.used as i64;
+                    let delta_percent = if state.reference.used > 0 {
+                        (delta as f64 / state.reference.used as f64) * 100.0
+                    } else {
+                        0.0
+                    };
                     let delta_str = if delta >= 0 {
                         format!(
-                            "+{}",
-                            bytesize::ByteSize(delta as u64)
+                            "+{} [+{:.2}%]",
+                            format_size(delta as u64, BINARY),
+                            delta_percent
                         )
                     } else {
                         format!(
-                            "-{}",
-                            bytesize::ByteSize((-delta) as u64)
+                            "-{} [{:.2}%]",
+                            format_size((-delta) as u64, BINARY),
+                            delta_percent.abs()
                         )
                     };
 
+                    let free_percent = (state.current.free as f64 / state.current.total as f64) * 100.0;
+                    let used_percent = (state.current.used as f64 / state.current.total as f64) * 100.0;
+
                     let info_text = format!(
-                        "Free: {}  |  Used: {}%  |  Delta: {}",
-                        bytesize::ByteSize(state.current.free),
-                        state.current.usage_percent(),
+                        "Free: {} [{:.2}%]  |  Used: {} [{:.2}%]  |  Total: {}  |  Delta: {}",
+                        format_size(state.current.free, BINARY),
+                        free_percent,
+                        format_size(state.current.used, BINARY),
+                        used_percent,
+                        format_size(state.current.total, BINARY),
                         delta_str
                     );
                     f.render_widget(
