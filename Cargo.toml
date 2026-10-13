@@ -1,7 +1,7 @@
 [package]
 authors = ["Elad Karako <eladkarako@gmail.com>"]
 categories = ["command-line-utilities", "memory"]
-description = "physical memory report for all platforms. Windows users can press W to free some RAM from other programs (FreeRam-XP-Pro style)."
+description = "RAM info in terminal (press: [q] to quit, [r] to reset a reference point in-time used RAM difference)."
 documentation = "https://github.com/eladkarako/ram_report#readme"
 edition = "2024"
 homepage = "https://github.com/eladkarako/ram_report"
@@ -14,32 +14,16 @@ rust-version = "1.93.0"
 version = "26.11.13"
 
 [dependencies]
-anyhow = "1.0.104"
+anyhow = { version = "1.0.104" }
 bytesize = { version = "2.7.0" }
-crossterm = { version = "0.29.0", features = ["event-stream"] }
-env_logger = "0.11.11"
-futures = "0.3.34"
-indicatif = { version = "0.18.6", features = ["tokio"] }
-log = "0.4.34"
-sysinfo = { version = "0.39.6", features = ["multithread"] }
-thiserror = "2.0.21"
-tokio = { version = "1.53.2", features = ["full"] }
-mimalloc = "0.1.52"
+crossterm = { version = "0.29.0", features = ["events", "libc", "windows"] }
+parking_lot = { version = "0.12.5" }
 ratatui = { version = "0.30.2", features = ["crossterm", "layout-cache"] }
+sys-info = { version = "0.9.1" }
 
 # Optional: Memory allocation improvements
 [target.'cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))'.dependencies]
 mimalloc = { version = "0.1.52" }
-
-[target.x86_64-pc-windows-msvc.dependencies]
-winapi = { version = "0.3.9", features = ["processthreadsapi", "tlhelp32", "winnt", "psapi"] }
-
-[target.i686-pc-windows-msvc.dependencies]
-winapi = { version = "0.3.9", features = ["processthreadsapi", "tlhelp32", "winnt", "psapi"] }
-
-[target.aarch64-pc-windows-msvc.dependencies]
-winapi = { version = "0.3.9", features = ["processthreadsapi", "tlhelp32", "winnt", "psapi"] }
-
 
 [target.x86_64-pc-windows-msvc.build-dependencies]
 toml = "1.1.8"
