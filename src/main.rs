@@ -33,6 +33,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use sysinfo::{MemoryRefreshKind, System};
 
 // Update cycle timings (milliseconds)
 const MAX_HISTORY: usize = 120;
@@ -64,16 +65,16 @@ struct AppState {
     history: VecDeque<u64>,
 }
 
-fn get_memory_snapshot() -> Result<RamSnapshot> {
-    let mem = sys_info::mem_info()
-        .context("Failed to read memory info")?;
+fn get_memory_snapshot(system: &mut System) -> Result<RamSnapshot> {
+    system.refresh_memory_specifics(
+        MemoryRefreshKind::nothing().with_ram(),
+    );
 
-    let total = mem
-        .total
+    let total = (system.total_memory() / 1_000)
         .checked_mul(KILOBYTE_MULTIPLIER)
         .context("Total memory calculation overflow")?;
-    let free = mem
-        .free
+
+    let free = (system.free_memory() / 1_000)
         .checked_mul(KILOBYTE_MULTIPLIER)
         .context("Free memory calculation overflow")?;
 
@@ -102,7 +103,10 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))
         .context("Failed to create terminal")?;
 
-    let initial_snapshot = get_memory_snapshot()?;
+    let mut system = System::new(); // Create System once for initial snapshot
+    let initial_snapshot = get_memory_snapshot(&mut system)
+        .context("Failed to get initial memory snapshot")?;
+
     ensure!(initial_snapshot.total != 0, "Total memory is zero");
 
     let mut initial_history = VecDeque::with_capacity(MAX_HISTORY);
@@ -162,13 +166,15 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
     let app_state_data = Arc::clone(&app_state);
     let exit_flag_data = Arc::clone(&exit_flag);
     std::thread::spawn(move || {
+        let mut system = System::new(); //Create System once per thread
+
         let mut last_update = std::time::Instant::now();
         while !exit_flag_data.load(Ordering::Relaxed) {
             // Poll-based timing instead of sleep
             if last_update.elapsed()
                 >= Duration::from_millis(UPDATE_INTERVAL_MS)
             {
-                match get_memory_snapshot() {
+                match get_memory_snapshot(&mut system) {
                     Ok(snapshot) => {
                         let mut state = app_state_data.write();
                         state.current = snapshot;
@@ -262,7 +268,7 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                             .block(
                                 Block::default()
                                     .borders(Borders::ALL)
-                                    .title("Memory Usage")
+                                    .title(format!("◧ Memory Usage (Total: {})", format_size(state.reference.total, BINARY)))
                             ),
                         chunks[0],
                     );
@@ -290,7 +296,7 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                             .block(
                                 Block::default()
                                     .borders(Borders::ALL)
-                                    .title("Memory History")
+                                    .title("◪ Memory History")
                             ),
                         chunks[2],
                     );

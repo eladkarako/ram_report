@@ -4,6 +4,8 @@
 * consuming ctrl+c as well as q (quit), and r (refresh), and on windows alt+f4. working in raw terminal mode for reactivity kind of makes it mandatory.
 * making border and descriptions to include better formatted sizes.
 * delta (diff) widget (paragraph) has the referenced used RAM size in the border-title (as well as instruction to press R to reset).
+* switching from `sys-info` (which is very fast) to a little slower `sysinfo` crate since `sysinfo` (needs / 1000 since you get bytes) supports all architectures including arm7 Android. `sysinfo` allows explicitly refreshing only RAM and excluding swap file (not sure if `sys-info` was quering that..). using specific `free` method instead of `available` for free RAM since Windows and FreeBSD do not report it.
+* adding total RAM to title of first chart (and a little ASCII math-block icon before each title).
 
 26.10.13
 * removing key-event system, increasing refresh rate, fixing write position.
