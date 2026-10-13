@@ -23,7 +23,7 @@ use parking_lot::RwLock;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    widgets::{Gauge, Paragraph, Sparkline},
+    widgets::{Block, Borders, Gauge, Paragraph, Sparkline},
     Terminal,
 };
 use std::{
@@ -46,9 +46,6 @@ const INFO_SECTION_HEIGHT: u16 = 3;
 const GAUGE_SECTION_HEIGHT: u16 = 5;
 const CHART_SECTION_HEIGHT: u16 = 5;
 
-// Percentage bounds
-const USAGE_PERCENT_MAX: u64 = 100;
-
 // Memory calculation factors
 const KILOBYTE_MULTIPLIER: u64 = 1024;
 
@@ -59,11 +56,7 @@ struct RamSnapshot {
     total: u64,
 }
 
-impl RamSnapshot {
-    fn usage_percent(&self) -> u64 {
-        ((self.used as f64 / self.total as f64) * 100.0) as u64
-    }
-}
+impl RamSnapshot {}
 
 struct AppState {
     current: RamSnapshot,
@@ -199,15 +192,6 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                 .draw(|f| {
                     let state = app_state.read();
 
-                    let chunks = Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([
-                            Constraint::Length(INFO_SECTION_HEIGHT),
-                            Constraint::Length(GAUGE_SECTION_HEIGHT),
-                            Constraint::Length(CHART_SECTION_HEIGHT),
-                        ])
-                        .split(f.area());
-
                     // Calculate delta from reference
                     let delta = state.current.used as i64
                         - state.reference.used as i64;
@@ -233,28 +217,42 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                     let free_percent = (state.current.free as f64 / state.current.total as f64) * 100.0;
                     let used_percent = (state.current.used as f64 / state.current.total as f64) * 100.0;
 
-                    let info_text = format!(
-                        "Free: {} [{:.2}%]  |  Used: {} [{:.2}%]  |  Total: {}  |  Delta: {}",
-                        format_size(state.current.free, BINARY),
-                        free_percent,
-                        format_size(state.current.used, BINARY),
-                        used_percent,
-                        format_size(state.current.total, BINARY),
-                        delta_str
-                    );
+
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([
+                            Constraint::Length(GAUGE_SECTION_HEIGHT),
+                            Constraint::Length(INFO_SECTION_HEIGHT),
+                            Constraint::Length(CHART_SECTION_HEIGHT),
+                        ])
+                        .split(f.area());
+                    
                     f.render_widget(
-                        Paragraph::new(info_text),
+                        Gauge::default()
+                            .percent(used_percent as u16)
+                            .label(
+                                format!("Used: {} [{:.2}%]  |  Free: {:} [{:.2}%]",
+                                        format_size(state.current.used, BINARY),
+                                        used_percent,
+                                        format_size(state.current.free, BINARY),
+                                        free_percent,
+                                )
+                            )
+                            .block(
+                                Block::default()
+                                    .borders(Borders::ALL)
+                                    .title("Memory Usage")
+                            ),
                         chunks[0],
                     );
 
-                    let usage = state
-                        .current
-                        .usage_percent()
-                        .min(USAGE_PERCENT_MAX);
                     f.render_widget(
-                        Gauge::default()
-                            .percent(usage as u16)
-                            .label(format!("{}%", usage)),
+                        Paragraph::new(format!("{}", delta_str))
+                            .block(
+                                Block::default()
+                                    .borders(Borders::ALL)
+                                    .title("∆ Delta Change (Press R to reset)")
+                            ),
                         chunks[1],
                     );
 
@@ -267,7 +265,12 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                                     .copied()
                                     .collect::<Vec<_>>(),
                             )
-                            .max(state.current.total),
+                            .max(state.current.total)
+                            .block(
+                                Block::default()
+                                    .borders(Borders::ALL)
+                                    .title("Memory History")
+                            ),
                         chunks[2],
                     );
                 })
