@@ -39,7 +39,7 @@ const MAX_HISTORY: usize = 120;
 const UPDATE_INTERVAL_MS: u64 = 500;
 const RENDER_INTERVAL_MS: u64 = 100;
 const INPUT_TIMEOUT_MS: u64 = 50;
-const MAIN_LOOP_SLEEP_MS: u64 = 50;
+const MAIN_LOOP_SLEEP_MS: u64 = 300;
 
 // Layout constraints (height in lines)
 const INFO_SECTION_HEIGHT: u16 = 3;
@@ -217,6 +217,14 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                     let free_percent = (state.current.free as f64 / state.current.total as f64) * 100.0;
                     let used_percent = (state.current.used as f64 / state.current.total as f64) * 100.0;
 
+                    let margin_chunks = Layout::default()
+                        .direction(Direction::Horizontal) //adds a right and left padding, it helps to avoid cropping in some terminals.
+                        .constraints([
+                            Constraint::Length(1),  // left margin
+                            Constraint::Min(0),     // main content area
+                            Constraint::Length(1),  // right margin
+                        ])
+                        .split(f.area());
 
                     let chunks = Layout::default()
                         .direction(Direction::Vertical)
@@ -225,8 +233,8 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                             Constraint::Length(INFO_SECTION_HEIGHT),
                             Constraint::Length(CHART_SECTION_HEIGHT),
                         ])
-                        .split(f.area());
-                    
+                        .split(margin_chunks[1]);
+
                     f.render_widget(
                         Gauge::default()
                             .percent(used_percent as u16)
@@ -251,7 +259,7 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                             .block(
                                 Block::default()
                                     .borders(Borders::ALL)
-                                    .title("∆ Delta Change (Press R to reset)")
+                                    .title(format!("∆ Delta Change to {} (Press R to reset)", format_size(state.reference.used, BINARY)))
                             ),
                         chunks[1],
                     );
