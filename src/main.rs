@@ -138,6 +138,19 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                             reset_flag_input
                                 .store(true, Ordering::Relaxed);
                         }
+                        #[cfg(target_os = "windows")]
+                        KeyCode::F(4) if key.modifiers.contains(
+                            crossterm::event::KeyModifiers::ALT
+                        ) => {
+                            exit_flag_input.store(true, Ordering::Relaxed);
+                            break;
+                        }
+                        KeyCode::Char('c') if key.modifiers.contains(
+                            crossterm::event::KeyModifiers::CONTROL
+                        ) => {
+                            exit_flag_input.store(true, Ordering::Relaxed);
+                            break;
+                        }
                         _ => {}
                     }
                 }
