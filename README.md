@@ -2,7 +2,7 @@
 
 physical memory report, history, and delta (which you can reset to current time).
 
-![](screenshot.gif)
+![](resources/logos/screenshot.gif)
 
 <hr/>
 
