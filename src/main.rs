@@ -23,7 +23,9 @@ use parking_lot::RwLock;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders, Gauge, Paragraph, Sparkline},
+    widgets::{
+        Block, Borders, Gauge, Paragraph, RenderDirection, Sparkline,
+    },
     Terminal,
 };
 use std::{
@@ -33,6 +35,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+
 use sysinfo::{MemoryRefreshKind, System};
 
 // Update cycle timings (milliseconds)
@@ -178,10 +181,10 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                     Ok(snapshot) => {
                         let mut state = app_state_data.write();
                         state.current = snapshot;
-                        state.history.push_back(snapshot.used);
+                        state.history.push_front(snapshot.used);
 
                         if state.history.len() > MAX_HISTORY {
-                            state.history.pop_front();
+                            state.history.pop_back();
                         }
                     }
                     Err(e) => {
@@ -285,6 +288,7 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
 
                     f.render_widget(
                         Sparkline::default()
+                            .direction(RenderDirection::RightToLeft)
                             .data(
                                 state
                                     .history
@@ -296,7 +300,7 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                             .block(
                                 Block::default()
                                     .borders(Borders::ALL)
-                                    .title("◪ Memory History")
+                                    .title(format!("◪ Memory History (latest {} updates, newest on left, oldest on right)", MAX_HISTORY))
                             ),
                         chunks[2],
                     );

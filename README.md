@@ -1,8 +1,8 @@
 # ram_report
 
-RAM info in terminal (press: `q` to quit, `r` to reset a reference point in-time used RAM difference).
+physical memory report, history, and delta (which you can reset to current time).
 
-![](screenshot_program.png)
+![](screenshot.gif)
 
 <hr/>
 

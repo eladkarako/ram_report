@@ -1,7 +1,7 @@
 [package]
 authors = ["Elad Karako <eladkarako@gmail.com>"]
 categories = ["command-line-utilities", "memory"]
-description = "RAM info in terminal (press: [q] to quit, [r] to reset a reference point in-time used RAM difference)."
+description = "physical memory report, history, and delta (which you can reset to current time)."
 documentation = "https://github.com/eladkarako/ram_report#readme"
 edition = "2024"
 homepage = "https://github.com/eladkarako/ram_report"
