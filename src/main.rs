@@ -178,10 +178,10 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
                     Ok(snapshot) => {
                         let mut state = app_state_data.write();
                         state.current = snapshot;
-                        state.history.push_front(snapshot.used);
+                        state.history.push_back(snapshot.used);
 
                         if state.history.len() > MAX_HISTORY {
-                            state.history.pop_back();
+                            state.history.pop_front();
                         }
                     }
                     Err(e) => {
