@@ -2,6 +2,7 @@
 * splitting logic main->app,ui,memory modules
 * using mimalloc instead of segmented heap in windows os as well.
 * embedding MSVC using some speed optimization for build.
+* chart/text colors support via themes (palette). handled by the amount of colors supported by each console/terminal. existance of the environment variable `NO_COLOR` would keep the output without colors.
 
 26.10.14
 * improved readibility. now all in 3 `ratatui`-"widgets" (two charts and one which is is a paragraph-widget).

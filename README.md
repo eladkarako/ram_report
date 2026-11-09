@@ -2,7 +2,7 @@
 
 physical memory report, history, and delta (which you can reset to current time).
 
-![](resources/logos/screenshot.gif)
+![](resources/logos/screenshot_colors.gif)
 
 <hr/>
 
@@ -41,6 +41,21 @@ physical memory report, history, and delta (which you can reset to current time)
 
 </details>
 
+<hr/>
+
+<details><summary>colors</summary>
+
+| Where it runs                                        | Detected level | Colours used                                                                                             |
+|------------------------------------------------------|----------------|----------------------------------------------------------------------------------------------------------|
+| Windows Terminal (WT_SESSION is set)                 | TrueColor      | A smooth RGB gradient from green through yellow to red on the gauge, plus custom RGB titles and borders. |
+| VS Code, WezTerm, iTerm2, Hyper (via `TERM_PROGRAM`) | TrueColor      | Same as Windows Terminal.                                                                                |
+| Legacy cmd.exe / conhost                             | Basic          | The 16 named ANSI colours only, with thresholds at 60% and 85%.                                          |
+| Linux or macOS with a 256color TERM                  | Ansi256        | Indexed palette colours with the same thresholds.                                                        |
+| `NO_COLOR` is set                                    | Mono           | No colour, as the no-color convention (https://no-color.org/) requires.                                  |
+
+![](resources/logos/screenshot.gif)
+
+</details>
 <hr/>
 
 this is a free and open-source program that works across all OS,  

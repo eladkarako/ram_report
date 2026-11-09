@@ -13,6 +13,8 @@ mod app;
 
 mod memory;
 
+mod theme;
+
 mod ui;
 
 use anyhow::{ensure, Context, Result};
@@ -36,6 +38,7 @@ use std::{
     time::{Duration, Instant},
 };
 use sysinfo::System;
+use theme::Theme;
 
 const RENDER_INTERVAL_MS: u64 = 100;
 const MAIN_LOOP_SLEEP_MS: u64 = 300;
@@ -67,6 +70,9 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
     let exit_flag = Arc::new(AtomicBool::new(false));
     let reset_flag = Arc::new(AtomicBool::new(false));
 
+    // Detected once at startup; the environment does not change while running.
+    let theme = Theme::detect();
+
     spawn_input_listener(
         Arc::clone(&exit_flag),
         Arc::clone(&reset_flag),
@@ -83,7 +89,7 @@ fn run_app(stdout: &mut Stdout) -> Result<()> {
             >= Duration::from_millis(RENDER_INTERVAL_MS)
         {
             terminal
-                .draw(|f| ui::draw(f, &app_state.read()))
+                .draw(|f| ui::draw(f, &app_state.read(), &theme))
                 .context("Failed to draw UI")?;
             last_render = Instant::now();
         }
